@@ -1,7 +1,13 @@
+from __future__ import print_function
+
 import time
 import boto
 import boto.ec2
 import sys
+import sys
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 keyname=sys.argv[1]
 instance_type=sys.argv[2]
@@ -47,23 +53,37 @@ def auto_vpn(ami=ami,
             else: 
                 raise
 
-    reservation = ec2.run_instances(ami,
+    spot_request = ec2.request_spot_instances(
+        price="0.005",
+        count=1,
+        image_id=ami,
         key_name=key_name,
         security_groups=[group_name],
         instance_type=instance_type,
-        user_data=user_data)
-    
-    instance = reservation.instances[0]
-    while instance.state != 'running':
-        time.sleep(30)
-        instance.update()
+        user_data=user_data,
+        )[0]
 
-        instance.add_tag(tag)
+    while True:
+        eprint("Waiting. spot request status: '%s', state: '%s'" % (spot_request.state, spot_request.status.code))
+        if spot_request.state == 'active' and spot_request.status.code == 'fulfilled':
+            break
+        time.sleep(10)
+        spot_request = ec2.get_all_spot_instance_requests(request_ids=[spot_request.id])[0]
+    while True:
+        instance = ec2.get_all_instances(instance_ids=[spot_request.instance_id])[0].instances[0]
+        eprint("Waiting. spot instance state: '%s'" % instance.state)
+        if instance.state == 'running':
+            break
+        time.sleep(10)
+
+
+    ec2.create_tags([instance.id], {tag:""})
 
     global host
+    instance = ec2.get_all_instances(instance_ids=[spot_request.instance_id])[0].instances[0]
     host = instance.ip_address
-    print "%s" % host
+    print("%s" % host)
 	
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     auto_vpn()

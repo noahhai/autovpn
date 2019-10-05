@@ -13,7 +13,7 @@ def ec2_terminate():
                     
 	ec2 = conn_region  
 	
-	ec2.terminate_instances(instance_ids=[instances])
+	ec2.cancel_spot_instance_requests(request_ids=[instances])
 	print "Success"	
 	
 

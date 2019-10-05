@@ -6,3 +6,5 @@ test.log
 regions
 .DS_Store
 .vscode
+.idea*
+env*
